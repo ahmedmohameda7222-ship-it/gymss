@@ -1,0 +1,130 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { CheckCircle2, Plus, Timer } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toaster";
+import { useAuth } from "@/components/auth/auth-provider";
+import { completeWorkoutSession, startWorkoutSession } from "@/services/database/repository";
+import type { Workout, WorkoutSession } from "@/types";
+
+type SetLog = {
+  reps: number;
+  weight: number;
+  notes: string;
+};
+
+export function WorkoutSessionForm({ workout }: { workout: Workout }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+  const [session, setSession] = useState<WorkoutSession | null>(null);
+  const [duration, setDuration] = useState(45);
+  const [notes, setNotes] = useState("");
+  const [sets, setSets] = useState<SetLog[]>([{ reps: 10, weight: 0, notes: "" }]);
+
+  useEffect(() => {
+    startWorkoutSession(user?.id ?? "mock-user", workout).then(setSession);
+  }, [user, workout]);
+
+  async function complete() {
+    if (session) {
+      await completeWorkoutSession(session.id, notes, duration);
+    }
+    toast({ title: "Workout completed", description: `${workout.name} was saved to your S&S Gym history.` });
+    router.push("/workouts");
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Log workout results</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {sets.map((set, index) => (
+          <div key={index} className="rounded-md border p-3">
+            <p className="mb-3 text-sm font-semibold">Set {index + 1}</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor={`reps-${index}`}>Reps</Label>
+                <Input
+                  id={`reps-${index}`}
+                  type="number"
+                  min="0"
+                  value={set.reps}
+                  onChange={(event) =>
+                    setSets((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, reps: Number(event.target.value) } : item)))
+                  }
+                  placeholder="Reps completed, e.g. 10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`weight-${index}`}>Weight kg</Label>
+                <Input
+                  id={`weight-${index}`}
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={set.weight}
+                  onChange={(event) =>
+                    setSets((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, weight: Number(event.target.value) } : item)))
+                  }
+                  placeholder="Weight used, e.g. 40"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`set-note-${index}`}>Set note</Label>
+                <Input
+                  id={`set-note-${index}`}
+                  value={set.notes}
+                  onChange={(event) =>
+                    setSets((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, notes: event.target.value } : item)))
+                  }
+                  placeholder="Set note, e.g. smooth reps"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+        <Button variant="outline" onClick={() => setSets((current) => [...current, { reps: 10, weight: 0, notes: "" }])}>
+          <Plus className="h-4 w-4" />
+          Add set
+        </Button>
+        <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+          <div className="space-y-2">
+            <Label htmlFor="duration">Duration minutes</Label>
+            <Input
+              id="duration"
+              type="number"
+              min="1"
+              value={duration}
+              onChange={(event) => setDuration(Number(event.target.value))}
+              placeholder="Workout duration, e.g. 45"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="workout-notes">Workout notes</Label>
+            <Input
+              id="workout-notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Workout note, e.g. felt strong today"
+            />
+          </div>
+        </div>
+        <Button className="w-full" onClick={complete}>
+          <CheckCircle2 className="h-4 w-4" />
+          Mark workout completed
+        </Button>
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Timer className="h-4 w-4" />
+          Total volume is calculated from logged sets when exercise logs are saved in Supabase.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}

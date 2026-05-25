@@ -1,0 +1,23 @@
+-- S&S Gym full workout video import placeholder.
+-- Use this file when adding the complete 3000+ workout video table.
+--
+-- Expected columns from your table:
+-- exercise_name, category_type, category, exercise_url
+--
+-- Convert the table to INSERT rows like this:
+--
+-- insert into public.exercise_videos
+--   (exercise_name, category_type, category, exercise_url, video_url, instructions, source, is_global)
+-- values
+--   ('Military Press (AKA Overhead Press)', 'Muscle Group', 'Shoulders', 'https://www.muscleandstrength.com/exercises/military-press.html', null, 'Brace your core and press overhead with control.', 'user_provided_workout_video_table', true)
+-- on conflict (exercise_name, category_type, category) do update
+-- set exercise_url = excluded.exercise_url,
+--     video_url = excluded.video_url,
+--     instructions = excluded.instructions,
+--     source = excluded.source,
+--     updated_at = now();
+--
+-- Important:
+-- The provided muscleandstrength.com URLs are instruction pages, not direct video files.
+-- S&S Gym stores them now and can replace video_url later with YouTube, Vimeo, or hosted video URLs for embedded playback.
+-- If no embeddable video_url exists, the app shows a clean in-app video placeholder and the instruction source.
