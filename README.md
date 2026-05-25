@@ -19,16 +19,18 @@ It is not a commercial SaaS app. There is no pricing, checkout, subscription, pa
 
 ## Netlify Environment Variables
 
-Add these in Netlify under Site configuration > Environment variables:
+The app currently includes hardcoded public Supabase fallback values in `lib/env.ts`, so Netlify environment variables are optional for this project.
+
+If you prefer environment variables later, add these in Netlify under Site configuration > Environment variables:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_URL=https://rxezxgvvlaihvpfxrpkj.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-NEXT_PUBLIC_APP_URL=https://your-netlify-site.netlify.app
+NEXT_PUBLIC_APP_URL=https://ssgym.netlify.app
 NEXT_PUBLIC_USE_MOCK_AUTH=false
 ```
 
-The app also has a code fallback in `lib/env.ts` for the public Supabase URL and anon key. Prefer Netlify variables, but if Netlify env injection is not working, those public values can be placed there and committed. Never place a Supabase `service_role` key in frontend code.
+Never place a Supabase `service_role` key in frontend code.
 
 ## Netlify Build Settings
 
