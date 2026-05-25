@@ -1,6 +1,6 @@
-const hardcodedSupabaseUrl = "https://rxezxgvvlaihvpfxrpkj.supabase.co";
+const hardcodedSupabaseUrl = "https://daohqnpwzdsoddmnnubt.supabase.co";
 const hardcodedSupabaseAnonKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4ZXp4Z3Z2bGFpaHZwZnhycGtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NTQyOTksImV4cCI6MjA5NTIzMDI5OX0.h2PlBV75cFbwK9RmPdI-D7jY1-l5LflaV9Q80DdXfi4";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhb2hxbnB3emRzb2RkbW5udWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzkwMjgsImV4cCI6MjA5NTMxNTAyOH0.pBo48B5Z4aFiFWmyqsuTd9AYOxkhW_4UvPV-TO63wmA";
 const hardcodedAppUrl = "https://ssgym.netlify.app";
 
 export const env = {

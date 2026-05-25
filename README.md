@@ -24,7 +24,7 @@ The app currently includes hardcoded public Supabase fallback values in `lib/env
 If you prefer environment variables later, add these in Netlify under Site configuration > Environment variables:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://rxezxgvvlaihvpfxrpkj.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://daohqnpwzdsoddmnnubt.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 NEXT_PUBLIC_APP_URL=https://ssgym.netlify.app
 NEXT_PUBLIC_USE_MOCK_AUTH=false
