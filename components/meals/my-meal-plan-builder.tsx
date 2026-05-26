@@ -1,82 +1,109 @@
-
 "use client";
 
+import dynamic from "next/dynamic";
 import { CheckCircle2, PlusCircle, Trash2, Utensils } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FoodBrowser } from "@/components/meals/food-browser";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useToast } from "@/components/ui/toaster";
 import { deleteMealPlanItem, getTodayMealPlanItems, markMealPlanItemDone, mealTypes } from "@/services/database/repository";
-import { sumFoodLogs } from "@/services/nutrition/calculations";
-import type { FoodLog, MealPlanItem, MealType } from "@/types";
+import type { MealPlanItem, MealType } from "@/types";
 
-function emptyTotals() {
+const FoodBrowser = dynamic(
+  () => import("@/components/meals/food-browser").then((module) => module.FoodBrowser),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-md border bg-white p-4 text-sm text-muted-foreground">
+        Loading food picker...
+      </div>
+    )
+  }
+);
+
+type MacroTotals = {
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+};
+
+function emptyTotals(): MacroTotals {
   return { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+}
+
+function addItemToTotals(total: MacroTotals, item: Pick<MealPlanItem, "calories" | "protein_g" | "carbs_g" | "fat_g">): MacroTotals {
+  return {
+    calories: total.calories + Number(item.calories || 0),
+    protein_g: total.protein_g + Number(item.protein_g || 0),
+    carbs_g: total.carbs_g + Number(item.carbs_g || 0),
+    fat_g: total.fat_g + Number(item.fat_g || 0)
+  };
 }
 
 export function MyMealPlanBuilder() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState<MealPlanItem[]>([]);
-  const [createdLogs, setCreatedLogs] = useState<FoodLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingId, setIsUpdatingId] = useState<string | null>(null);
-
-  async function loadPlan() {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      setItems(await getTodayMealPlanItems(user.id));
-    } catch (error) {
-      toast({ title: "Could not load My Meal Plan", description: error instanceof Error ? error.message : "Run the latest SQL migration first." });
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const [showFoodPicker, setShowFoodPicker] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
+    let active = true;
+
+    async function loadPlan() {
+      if (!user) {
+        if (active) setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError("");
+
+      try {
+        const planItems = await getTodayMealPlanItems(user.id);
+        if (active) setItems(planItems);
+      } catch (error) {
+        if (!active) return;
+        setItems([]);
+        setLoadError(error instanceof Error ? error.message : "Could not load today's meal plan.");
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
+
     loadPlan();
+
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   const plannedTotals = useMemo(() => {
-    return items
-      .filter((item) => item.status === "planned")
-      .reduce(
-        (sum, item) => ({
-          calories: sum.calories + Number(item.calories),
-          protein_g: sum.protein_g + Number(item.protein_g),
-          carbs_g: sum.carbs_g + Number(item.carbs_g),
-          fat_g: sum.fat_g + Number(item.fat_g)
-        }),
-        emptyTotals()
-      );
+    return items.filter((item) => item.status === "planned").reduce(addItemToTotals, emptyTotals());
   }, [items]);
 
   const doneTotals = useMemo(() => {
-    const doneItems = items
-      .filter((item) => item.status === "done")
-      .map((item) => ({
-        calories: Number(item.calories),
-        protein_g: Number(item.protein_g),
-        carbs_g: Number(item.carbs_g),
-        fat_g: Number(item.fat_g)
-      })) as FoodLog[];
-    return sumFoodLogs([...doneItems, ...createdLogs]);
-  }, [createdLogs, items]);
+    return items.filter((item) => item.status === "done").reduce(addItemToTotals, emptyTotals());
+  }, [items]);
 
   async function markDone(item: MealPlanItem) {
+    if (item.status === "done") return;
+
     try {
       setIsUpdatingId(item.id);
       const result = await markMealPlanItemDone(item);
-      const createdLog = result.log;
       setItems((current) => current.map((currentItem) => (currentItem.id === result.item.id ? result.item : currentItem)));
-      if (createdLog) setCreatedLogs((current) => [createdLog, ...current]);
       toast({ title: "Meal marked done", description: `${item.food_name} was added to today's calories.` });
     } catch (error) {
-      toast({ title: "Could not mark meal done", description: error instanceof Error ? error.message : "Please try again." });
+      toast({
+        title: "Could not mark meal done",
+        description: error instanceof Error ? error.message : "Please run the latest Supabase SQL migration and try again."
+      });
     } finally {
       setIsUpdatingId(null);
     }
@@ -96,17 +123,42 @@ export function MyMealPlanBuilder() {
   }
 
   function addPlannedItem(item: MealPlanItem) {
-    setItems((current) => [item, ...current]);
+    setItems((current) => {
+      if (current.some((currentItem) => currentItem.id === item.id)) return current;
+      return [item, ...current];
+    });
   }
 
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Planned left" value={plannedTotals.calories} detail={`${plannedTotals.protein_g}g protein planned`} />
-        <SummaryCard label="Done today" value={doneTotals.calories} detail={`${doneTotals.protein_g}g protein logged`} />
-        <SummaryCard label="Planned carbs" value={plannedTotals.carbs_g} suffix="g" detail={`${plannedTotals.fat_g}g fat planned`} />
-        <SummaryCard label="Done carbs" value={doneTotals.carbs_g} suffix="g" detail={`${doneTotals.fat_g}g fat logged`} />
+        <SummaryCard label="Planned" value={plannedTotals.calories} detail={`${Math.round(plannedTotals.protein_g)}g protein planned`} />
+        <SummaryCard label="Done today" value={doneTotals.calories} detail={`${Math.round(doneTotals.protein_g)}g protein logged`} />
+        <SummaryCard label="Planned carbs" value={plannedTotals.carbs_g} suffix="g" detail={`${Math.round(plannedTotals.fat_g)}g fat planned`} />
+        <SummaryCard label="Done carbs" value={doneTotals.carbs_g} suffix="g" detail={`${Math.round(doneTotals.fat_g)}g fat logged`} />
       </div>
+
+      {loadError ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-5 text-sm text-amber-900">
+            My Meal Plan opened, but today's saved items could not be loaded. Run the latest Supabase meal-plan SQL migration if this is the first deploy.
+            <span className="mt-2 block text-xs">{loadError}</span>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Today's meals</h2>
+          <p className="text-sm text-muted-foreground">Planned food counts only after you press Mark done.</p>
+        </div>
+        <Button onClick={() => setShowFoodPicker((current) => !current)}>
+          <PlusCircle className="h-4 w-4" />
+          {showFoodPicker ? "Hide food picker" : "Add food"}
+        </Button>
+      </div>
+
+      {isLoading ? <p className="text-sm text-muted-foreground">Loading today's meal plan...</p> : null}
 
       <div className="grid gap-4 xl:grid-cols-4">
         {mealTypes.map((type) => (
@@ -114,22 +166,20 @@ export function MyMealPlanBuilder() {
         ))}
       </div>
 
-      {isLoading ? <p className="text-sm text-muted-foreground">Loading today's meal plan...</p> : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <PlusCircle className="h-5 w-5" />
-            Add food to My Meal Plan
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Planned food does not count in calories yet. It counts only when you mark it done.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <FoodBrowser onPlanAdded={addPlannedItem} />
-        </CardContent>
-      </Card>
+      {showFoodPicker ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PlusCircle className="h-5 w-5" />
+              Add food to My Meal Plan
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Choose Breakfast, Lunch, Snack, or Dinner before adding food.</p>
+          </CardHeader>
+          <CardContent>
+            <FoodBrowser onPlanAdded={addPlannedItem} />
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
@@ -139,7 +189,9 @@ function SummaryCard({ label, value, detail, suffix = " kcal" }: { label: string
     <Card>
       <CardContent className="pt-5">
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-2 text-2xl font-bold">{Math.round(Number(value) || 0)}{suffix}</p>
+        <p className="mt-2 text-2xl font-bold">
+          {Math.round(Number(value) || 0)}{suffix}
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
       </CardContent>
     </Card>
@@ -161,8 +213,8 @@ function MealColumn({
 }) {
   const totals = items.reduce(
     (sum, item) => ({
-      calories: sum.calories + Number(item.calories),
-      protein_g: sum.protein_g + Number(item.protein_g)
+      calories: sum.calories + Number(item.calories || 0),
+      protein_g: sum.protein_g + Number(item.protein_g || 0)
     }),
     { calories: 0, protein_g: 0 }
   );
@@ -184,7 +236,7 @@ function MealColumn({
               <div className="min-w-0">
                 <p className="font-semibold leading-5">{item.food_name}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{item.quantity}x {item.serving_size}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{Math.round(Number(item.calories))} kcal | {Math.round(Number(item.protein_g))}g protein</p>
+                <p className="mt-1 text-xs text-muted-foreground">{Math.round(Number(item.calories || 0))} kcal | {Math.round(Number(item.protein_g || 0))}g protein</p>
               </div>
               <Badge variant={item.status === "done" ? "success" : "outline"}>{item.status}</Badge>
             </div>

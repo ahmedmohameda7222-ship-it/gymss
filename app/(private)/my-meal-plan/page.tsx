@@ -1,6 +1,3 @@
-
-"use client";
-
 import { PageHeading } from "@/components/layout/page-heading";
 import { MyMealPlanBuilder } from "@/components/meals/my-meal-plan-builder";
 
